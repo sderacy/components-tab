@@ -51,14 +51,14 @@ export default class TabsWrapper extends ComponentWrapper<HTMLButtonElement> {
    */
   findCloseButtonByTabId(id: string): ButtonWrapper | null {
     return this.findComponent(
-      `.${styles['tabs-tab-link']}[data-testid="${id}"] ~ .${styles['tabs-tab-close-button']}`,
+      `.${styles['tabs-tab-link']}[data-testid="${id}"] ~ .${styles['tabs-tab-dismiss-button']}`,
       ButtonWrapper
     );
   }
 
   findCloseButtonByTabIndex(index: number): ButtonWrapper | null {
     return this.findComponent(
-      `.${styles['tabs-tab']}:nth-child(${index}) .${styles['tabs-tab-close-button']}`,
+      `.${styles['tabs-tab']}:nth-child(${index}) .${styles['tabs-tab-dismiss-button']}`,
       ButtonWrapper
     );
   }
@@ -72,7 +72,7 @@ export default class TabsWrapper extends ComponentWrapper<HTMLButtonElement> {
   }
 
   findActiveTabCloseButton(): ButtonWrapper | null {
-    return this.findComponent(`.${styles['tabs-tab-active']} ~ .${styles['tabs-tab-close-button']}`, ButtonWrapper);
+    return this.findComponent(`.${styles['tabs-tab-active']} ~ .${styles['tabs-tab-dismiss-button']}`, ButtonWrapper);
   }
 
   findActiveTabAction(): ElementWrapper | null {

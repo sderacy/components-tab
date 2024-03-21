@@ -71,6 +71,7 @@ $label-horizontal-spacing: awsui.$space-l;
   display: flex;
   max-inline-size: calc(90% - #{$label-horizontal-spacing});
 
+  & > div,
   & > button {
     background-color: transparent;
     display: flex;
