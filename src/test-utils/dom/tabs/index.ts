@@ -1,6 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 import { ComponentWrapper, ElementWrapper } from '@cloudscape-design/test-utils-core/dom';
+import ButtonWrapper from '../button';
 import styles from '../../../tabs/styles.selectors.js';
 
 export default class TabsWrapper extends ComponentWrapper<HTMLButtonElement> {
@@ -43,5 +44,38 @@ export default class TabsWrapper extends ComponentWrapper<HTMLButtonElement> {
    */
   findTabContent(): ElementWrapper<HTMLDivElement> | null {
     return this.find(`.${styles['tabs-content-active']}`);
+  }
+
+  /**
+   * Finds the close button by using the tab id
+   */
+  findCloseButtonByTabId(id: string): ButtonWrapper | null {
+    return this.findComponent(
+      `.${styles['tabs-tab-link']}[data-testid="${id}"] ~ .${styles['tabs-tab-close-button']}`,
+      ButtonWrapper
+    );
+  }
+
+  findCloseButtonByTabIndex(index: number): ButtonWrapper | null {
+    return this.findComponent(
+      `.${styles['tabs-tab']}:nth-child(${index}) .${styles['tabs-tab-close-button']}`,
+      ButtonWrapper
+    );
+  }
+
+  findActionByTabId(id: string): ElementWrapper | null {
+    return this.find(`.${styles['tabs-tab-link']}[data-testid="${id}"] ~ .${styles['tabs-tab-action']}`);
+  }
+
+  findActionByTabIndex(index: number): ElementWrapper | null {
+    return this.find(`.${styles['tabs-tab']}:nth-child(${index}) .${styles['tabs-tab-action']}`);
+  }
+
+  findActiveTabCloseButton(): ButtonWrapper | null {
+    return this.findComponent(`.${styles['tabs-tab-active']} ~ .${styles['tabs-tab-close-button']}`, ButtonWrapper);
+  }
+
+  findActiveTabAction(): ElementWrapper | null {
+    return this.find(`.${styles['tabs-tab-active']} ~ .${styles['tabs-tab-action']}`);
   }
 }
