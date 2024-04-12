@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 import { BaseComponentProps } from '../internal/base-component';
 import { NonCancelableEventHandler } from '../internal/events';
+import { BaseModalProps } from '../modal/interfaces';
 
-export interface CollectionPreferencesProps<CustomPreferenceType = any> extends BaseComponentProps {
+export interface CollectionPreferencesProps<CustomPreferenceType = any> extends BaseComponentProps, BaseModalProps {
   /**
    * Specifies the title of the preferences modal dialog. It is also used as an `aria-label` for the trigger button.
    * @i18n
@@ -87,7 +88,6 @@ export interface CollectionPreferencesProps<CustomPreferenceType = any> extends 
    * - `description` (string) - Specifies the text displayed below each radio group label.
    *
    * You must set the current value in the `preferences.stickyColumns` property.
-   * @i18n
    */
   stickyColumnsPreference?: CollectionPreferencesProps.StickyColumnsPreference;
   /**

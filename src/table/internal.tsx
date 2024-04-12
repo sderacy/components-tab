@@ -37,6 +37,7 @@ import { useMobile } from '../internal/hooks/use-mobile';
 import { useContainerQuery } from '@cloudscape-design/component-toolkit';
 import {
   GridNavigationProvider,
+  TableRole,
   getTableRoleProps,
   getTableRowRoleProps,
   getTableWrapperRoleProps,
@@ -48,6 +49,7 @@ import { useFunnelSubStep } from '../internal/analytics/hooks/use-funnel';
 import { NoDataCell } from './no-data-cell';
 import { usePerformanceMarks } from '../internal/hooks/use-performance-marks';
 import { getContentHeaderClassName } from '../internal/utils/content-header-utils';
+import { useExpandableTableProps } from './expandable-rows/expandable-rows-utils';
 
 const GRID_NAVIGATION_PAGE_SIZE = 10;
 const SELECTION_COLUMN_WIDTH = 54;
@@ -113,15 +115,28 @@ const InternalTable = React.forwardRef(
       renderAriaLive,
       stickyColumns,
       columnDisplay,
-      enableKeyboardNavigation = false,
+      enableKeyboardNavigation,
+      expandableRows,
       __funnelSubStepProps,
       ...rest
     }: InternalTableProps<T>,
     ref: React.Ref<TableProps.Ref>
   ) => {
+    // Keyboard navigation defaults to `true` for tables with expandable rows.
+    if (expandableRows && enableKeyboardNavigation === undefined) {
+      enableKeyboardNavigation = true;
+    }
+
     const baseProps = getBaseProps(rest);
     stickyHeader = stickyHeader && supportsStickyPosition();
     const isMobile = useMobile();
+
+    const { isExpandable, allItems, getExpandableItemProps } = useExpandableTableProps({
+      items,
+      expandableRows,
+      trackBy,
+      ariaLabels,
+    });
 
     const [containerWidth, wrapperMeasureRef] = useContainerQuery<number>(rect => rect.contentBoxWidth);
     const wrapperMeasureRefObject = useRef(null);
@@ -165,7 +180,7 @@ const InternalTable = React.forwardRef(
     const wrapperRefObject = useRef(null);
     const handleScroll = useScrollSync([wrapperRefObject, scrollbarRef, secondaryWrapperRef]);
 
-    const { moveFocusDown, moveFocusUp, moveFocus } = useSelectionFocusMove(selectionType, items.length);
+    const { moveFocusDown, moveFocusUp, moveFocus } = useSelectionFocusMove(selectionType, allItems.length);
     const { onRowClickHandler, onRowContextMenuHandler } = useRowEvents({ onRowClick, onRowContextMenu });
 
     const visibleColumnDefinitions = getVisibleColumnDefinitions({
@@ -175,7 +190,7 @@ const InternalTable = React.forwardRef(
     });
 
     const { isItemSelected, getSelectAllProps, getItemSelectionProps, updateShiftToggle } = useSelection({
-      items,
+      items: allItems,
       trackBy,
       selectedItems,
       selectionType,
@@ -231,7 +246,15 @@ const InternalTable = React.forwardRef(
 
     const hasStickyColumns = !!((stickyColumns?.first ?? 0) + (stickyColumns?.last ?? 0) > 0);
     const hasEditableCells = !!columnDefinitions.find(col => col.editConfig);
-    const tableRole = enableKeyboardNavigation ? 'grid' : hasEditableCells ? 'grid-default' : 'table';
+
+    let tableRole: TableRole = 'table';
+    if (isExpandable) {
+      tableRole = 'treegrid';
+    } else if (enableKeyboardNavigation) {
+      tableRole = 'grid';
+    } else if (hasEditableCells) {
+      tableRole = 'grid-default';
+    }
 
     const theadProps: TheadProps = {
       selectionType,
@@ -261,6 +284,7 @@ const InternalTable = React.forwardRef(
       stickyState,
       selectionColumnId,
       tableRole,
+      isExpandable,
     };
 
     const wrapperRef = useMergeRefs(wrapperRefObject, stickyState.refs.wrapper);
@@ -277,18 +301,19 @@ const InternalTable = React.forwardRef(
     const hasDynamicHeight = computedVariant === 'full-page';
     const overlapElement = useDynamicOverlap({ disabled: !hasDynamicHeight });
     useTableFocusNavigation({
-      tableRole,
+      enableKeyboardNavigation,
       selectionType,
       tableRoot: tableRefObject,
       columnDefinitions: visibleColumnDefinitions,
-      numRows: items?.length,
+      numRows: allItems?.length,
     });
     const toolsHeaderWrapper = useRef<HTMLDivElement>(null);
     // If is mobile, we take into consideration the AppLayout's mobile bar and we subtract the tools wrapper height so only the table header is sticky
     const toolsHeaderHeight =
       (toolsHeaderWrapper?.current as HTMLDivElement | null)?.getBoundingClientRect().height ?? 0;
 
-    const totalColumnsCount = selectionType ? visibleColumnDefinitions.length + 1 : visibleColumnDefinitions.length;
+    const colIndexOffset = selectionType ? 1 : 0;
+    const totalColumnsCount = visibleColumnDefinitions.length + colIndexOffset;
 
     return (
       <LinkDefaultVariantContext.Provider value={{ defaultVariant: 'primary' }}>
@@ -381,7 +406,7 @@ const InternalTable = React.forwardRef(
                 </LiveRegion>
               )}
               <GridNavigationProvider
-                keyboardNavigation={tableRole === 'grid'}
+                keyboardNavigation={!!enableKeyboardNavigation}
                 pageSize={GRID_NAVIGATION_PAGE_SIZE}
                 getTable={() => tableRefObject.current}
               >
@@ -407,7 +432,7 @@ const InternalTable = React.forwardRef(
                     {...theadProps}
                   />
                   <tbody>
-                    {loading || items.length === 0 ? (
+                    {loading || allItems.length === 0 ? (
                       <tr>
                         <NoDataCell
                           totalColumnsCount={totalColumnsCount}
@@ -420,17 +445,27 @@ const InternalTable = React.forwardRef(
                         />
                       </tr>
                     ) : (
-                      items.map((item, rowIndex) => {
-                        const firstVisible = rowIndex === 0;
-                        const lastVisible = rowIndex === items.length - 1;
-                        const isEven = rowIndex % 2 === 0;
-                        const isSelected = !!selectionType && isItemSelected(item);
-                        const isPrevSelected = !!selectionType && !firstVisible && isItemSelected(items[rowIndex - 1]);
-                        const isNextSelected = !!selectionType && !lastVisible && isItemSelected(items[rowIndex + 1]);
+                      allItems.map((item, rowIndex) => {
+                        const isFirstRow = rowIndex === 0;
+                        const isLastRow = rowIndex === allItems.length - 1;
+                        const sharedCellProps = {
+                          isFirstRow,
+                          isLastRow,
+                          isVisualRefresh,
+                          isSelected: hasSelection && isItemSelected(item),
+                          isPrevSelected: hasSelection && !isFirstRow && isItemSelected(allItems[rowIndex - 1]),
+                          isNextSelected: hasSelection && !isLastRow && isItemSelected(allItems[rowIndex + 1]),
+                          isEvenRow: rowIndex % 2 === 0,
+                          hasFooter,
+                          stripedRows,
+                          stickyState,
+                          tableRole,
+                        };
+                        const expandableItemProps = getExpandableItemProps(item);
                         return (
                           <tr
                             key={getItemKey(trackBy, item, rowIndex)}
-                            className={clsx(styles.row, isSelected && styles['row-selected'])}
+                            className={clsx(styles.row, sharedCellProps.isSelected && styles['row-selected'])}
                             onFocus={({ currentTarget }) => {
                               // When an element inside table row receives focus we want to adjust the scroll.
                               // However, that behaviour is unwanted when the focus is received as result of a click
@@ -444,29 +479,18 @@ const InternalTable = React.forwardRef(
                             onContextMenu={
                               onRowContextMenuHandler && onRowContextMenuHandler.bind(null, rowIndex, item)
                             }
-                            {...getTableRowRoleProps({ tableRole, firstIndex, rowIndex })}
+                            {...getTableRowRoleProps({ tableRole, firstIndex, rowIndex, ...expandableItemProps })}
                           >
-                            {selectionType !== undefined && (
+                            {hasSelection && (
                               <TableTdElement
+                                {...sharedCellProps}
                                 className={clsx(styles['selection-control'])}
-                                isVisualRefresh={isVisualRefresh}
-                                isFirstRow={firstVisible}
-                                isLastRow={lastVisible}
-                                isSelected={isSelected}
-                                isNextSelected={isNextSelected}
-                                isPrevSelected={isPrevSelected}
                                 wrapLines={false}
-                                isEvenRow={isEven}
-                                stripedRows={stripedRows}
-                                hasSelection={hasSelection}
-                                hasFooter={hasFooter}
-                                stickyState={stickyState}
+                                hasSelection={true}
                                 columnId={selectionColumnId}
                                 colIndex={0}
-                                tableRole={tableRole}
                               >
                                 <SelectionControl
-                                  tableRole={tableRole}
                                   onFocusDown={moveFocusDown}
                                   onFocusUp={moveFocusUp}
                                   onShiftToggle={updateShiftToggle}
@@ -474,13 +498,17 @@ const InternalTable = React.forwardRef(
                                 />
                               </TableTdElement>
                             )}
+
                             {visibleColumnDefinitions.map((column, colIndex) => {
                               const isEditing = cellEditing.checkEditing({ rowIndex, colIndex });
                               const successfulEdit = cellEditing.checkLastSuccessfulEdit({ rowIndex, colIndex });
                               const isEditable = !!column.editConfig && !cellEditing.isLoading;
+                              const expandableCellProps =
+                                isExpandable && colIndex === 0 ? expandableItemProps : undefined;
                               return (
                                 <TableBodyCell
                                   key={getColumnKey(column, colIndex)}
+                                  {...sharedCellProps}
                                   style={
                                     resizableColumns
                                       ? {}
@@ -497,25 +525,15 @@ const InternalTable = React.forwardRef(
                                   isEditable={isEditable}
                                   isEditing={isEditing}
                                   isRowHeader={column.isRowHeader}
-                                  isFirstRow={firstVisible}
-                                  isLastRow={lastVisible}
-                                  isSelected={isSelected}
-                                  isNextSelected={isNextSelected}
-                                  isPrevSelected={isPrevSelected}
                                   successfulEdit={successfulEdit}
                                   onEditStart={() => cellEditing.startEdit({ rowIndex, colIndex })}
                                   onEditEnd={editCancelled =>
                                     cellEditing.completeEdit({ rowIndex, colIndex }, editCancelled)
                                   }
                                   submitEdit={cellEditing.submitEdit}
-                                  hasFooter={hasFooter}
-                                  stripedRows={stripedRows}
-                                  isEvenRow={isEven}
                                   columnId={column.id ?? colIndex}
-                                  colIndex={selectionType !== undefined ? colIndex + 1 : colIndex}
-                                  stickyState={stickyState}
-                                  isVisualRefresh={isVisualRefresh}
-                                  tableRole={tableRole}
+                                  colIndex={colIndex + colIndexOffset}
+                                  {...expandableCellProps}
                                 />
                               );
                             })}

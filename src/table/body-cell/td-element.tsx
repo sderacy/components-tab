@@ -6,8 +6,9 @@ import styles from './styles.css.js';
 import { getStickyClassNames } from '../utils';
 import { StickyColumnsModel, useStickyCellStyles } from '../sticky-columns';
 import { TableRole, getTableCellRoleProps } from '../table-role';
-import { useMergeRefs } from '../../internal/hooks/use-merge-refs/index.js';
-import { useSingleTabStopNavigation } from '../../internal/context/single-tab-stop-navigation-context.js';
+import { useMergeRefs } from '../../internal/hooks/use-merge-refs';
+import { useSingleTabStopNavigation } from '../../internal/context/single-tab-stop-navigation-context';
+import { ExpandToggleButton } from '../expandable-rows/expand-toggle-button';
 
 export interface TableTdElementProps {
   className?: string;
@@ -36,6 +37,12 @@ export interface TableTdElementProps {
   stickyState: StickyColumnsModel;
   isVisualRefresh?: boolean;
   tableRole: TableRole;
+  level?: number;
+  isExpandable?: boolean;
+  isExpanded?: boolean;
+  onExpandableItemToggle?: () => void;
+  expandButtonLabel?: string;
+  collapseButtonLabel?: string;
 }
 
 export const TableTdElement = React.forwardRef<HTMLTableCellElement, TableTdElementProps>(
@@ -64,6 +71,12 @@ export const TableTdElement = React.forwardRef<HTMLTableCellElement, TableTdElem
       colIndex,
       stickyState,
       tableRole,
+      level,
+      isExpandable,
+      isExpanded,
+      onExpandableItemToggle,
+      expandButtonLabel,
+      collapseButtonLabel,
     },
     ref
   ) => {
@@ -98,6 +111,8 @@ export const TableTdElement = React.forwardRef<HTMLTableCellElement, TableTdElem
           isVisualRefresh && styles['is-visual-refresh'],
           hasSelection && styles['has-selection'],
           hasFooter && styles['has-footer'],
+          level !== undefined && styles['body-cell-expandable'],
+          level !== undefined && styles[`body-cell-expandable-level-${getLevelClassSuffix(level)}`],
           stickyStyles.className
         )}
         onClick={onClick}
@@ -107,8 +122,22 @@ export const TableTdElement = React.forwardRef<HTMLTableCellElement, TableTdElem
         {...nativeAttributes}
         tabIndex={cellTabIndex}
       >
-        {children}
+        {level !== undefined && isExpandable && (
+          <div className={styles['expandable-toggle-wrapper']}>
+            <ExpandToggleButton
+              isExpanded={isExpanded}
+              onExpandableItemToggle={onExpandableItemToggle}
+              expandButtonLabel={expandButtonLabel}
+              collapseButtonLabel={collapseButtonLabel}
+            />
+          </div>
+        )}
+        <span className={styles['body-cell-content']}>{children}</span>
       </Element>
     );
   }
 );
+
+function getLevelClassSuffix(level: number) {
+  return 1 <= level && level <= 9 ? level : 'next';
+}

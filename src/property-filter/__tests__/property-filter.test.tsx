@@ -478,6 +478,13 @@ describe('property filter parts', () => {
         });
         expect(wrapper.findTokens()![0].getElement()).toHaveTextContent('!: first');
       });
+      test('custom operator free text token', () => {
+        const { propertyFilterWrapper: wrapper } = renderComponent({
+          freeTextFiltering: { operators: ['!^'] },
+          query: { tokens: [{ value: 'first', operator: '!^' }], operation: 'or' },
+        });
+        expect(wrapper.findTokens()![0].getElement()).toHaveTextContent('!^ first');
+      });
       test('property token', () => {
         const { propertyFilterWrapper: wrapper } = renderComponent({
           query: { tokens: [{ propertyKey: 'range', value: 'value', operator: '>' }], operation: 'or' },
@@ -628,6 +635,24 @@ describe('property filter parts', () => {
             .map(optionWrapper => optionWrapper.getElement().textContent)
         ).toEqual(['string', 'string-other', 'default', 'string!=', 'state', 'range']);
       });
+      test('with custom free text operators', () => {
+        const { propertyFilterWrapper: wrapper } = renderComponent({
+          freeTextFiltering: { operators: ['=', '!=', ':', '!:'] },
+          query: { tokens: [{ value: 'first', operator: '!=' }], operation: 'or' },
+        });
+        const [contentWrapper] = openTokenEditor(wrapper);
+        expect(contentWrapper.getElement()).toHaveTextContent(
+          'PropertyAll propertiesOperator!=Does not equalValueCancelApply'
+        );
+        const operatorSelectWrapper = findOperatorSelector(contentWrapper);
+        act(() => operatorSelectWrapper.openDropdown());
+        expect(
+          operatorSelectWrapper
+            .findDropdown()
+            .findOptions()!
+            .map(optionWrapper => optionWrapper.getElement().textContent)
+        ).toEqual(['=Equals', '!=Does not equal', ':Contains', '!:Does not contain']);
+      });
       test('preserves fields, when one is edited', () => {
         const { propertyFilterWrapper: wrapper } = renderComponent({
           disableFreeTextFiltering: true,
@@ -748,6 +773,45 @@ describe('property filter parts', () => {
       });
       expect(wrapper.findTokenToggle()).toBeNull();
     });
+
+    describe('aria-label on toggle fewer/more button', () => {
+      const propertiesWithMultipleTokens: Partial<PropertyFilterProps> = {
+        tokenLimit: 1,
+        query: {
+          tokens: [
+            { propertyKey: 'string', value: 'first', operator: ':' },
+            { propertyKey: 'string', value: 'second', operator: ':' },
+          ],
+          operation: 'or',
+        },
+      };
+
+      test('sets no aria-label text on the expand button by default', () => {
+        const { propertyFilterWrapper: wrapper } = renderComponent(propertiesWithMultipleTokens);
+        expect(wrapper.findTokenToggle()!.getElement()).not.toHaveAttribute('aria-label');
+      });
+      test('sets aria-label text on the expand button when provided', () => {
+        const { propertyFilterWrapper: wrapper } = renderComponent({
+          ...propertiesWithMultipleTokens,
+          tokenLimitShowMoreAriaLabel: 'Show more token',
+        });
+        expect(wrapper.findTokenToggle()!.getElement()).toHaveAttribute('aria-label', 'Show more token');
+      });
+      test('sets no aria-label text on the collapse button by default', () => {
+        const { propertyFilterWrapper: wrapper } = renderComponent(propertiesWithMultipleTokens);
+        wrapper.findTokenToggle()!.click();
+        expect(wrapper.findTokenToggle()!.getElement()).not.toHaveAttribute('aria-label');
+      });
+      test('sets aria-label text on the collapse button when provided', () => {
+        const { propertyFilterWrapper: wrapper } = renderComponent({
+          ...propertiesWithMultipleTokens,
+          tokenLimitShowFewerAriaLabel: 'Show fewer token',
+        });
+        wrapper.findTokenToggle()!.click();
+        expect(wrapper.findTokenToggle()!.getElement()).toHaveAttribute('aria-label', 'Show fewer token');
+      });
+    });
+
     test('toggles the visibility of tokens past the limit', () => {
       const { propertyFilterWrapper: wrapper } = renderComponent({
         tokenLimit: 1,
